@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8" />
+  <title>Crypto Price Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Crypto Price Dashboard</h1>
+    <div id="crypto-list"></div>
+    
+    <h2 id="chart-title">Select a cryptocurrency to see the price chart</h2>
+    <canvas id="priceChart" width="600" height="300"></canvas>
+  </div>
+
+  <script>
+    const cryptoListEl = document.getElementById('crypto-list');
+    const chartTitleEl = document.getElementById('chart-title');
+    const ctx = document.getElementById('priceChart').getContext('2d');
+
+    let chart;
+
+    // Fetch top 10 cryptocurrencies by market cap
+    async function fetchTopCryptos() {
+      const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1&sparkline=false');
+      const cryptos = await res.json();
+
+      cryptoListEl.innerHTML = '';
+      cryptos.forEach(crypto => {
+        const div = document.createElement('div');
+        div.className = 'crypto-item';
+        div.innerHTML = `
+          <img src="${crypto.image}" alt="${crypto.name}" width="24" height="24" />
+          <strong>${crypto.name} (${crypto.symbol.toUpperCase()})</strong>:
+          $${crypto.current_price.toLocaleString()}
+          <button onclick="showChart('${crypto.id}', '${crypto.name}')">View Chart</button>
+        `;
+        cryptoListEl.appendChild(div);
+      });
+    }
+
+    // Fetch historic prices for the chart (last 30 days)
+    async function fetchPriceHistory(id) {
+      const res = await fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=30&interval=daily`);
+      const data = await res.json();
+      return data.prices; // Array of [timestamp, price]
+    }
+
+    // Show chart for selected crypto
+    async function showChart(id, name) {
+      chartTitleEl.textContent = `${name} Price (Last 30 Days)`;
+
+      const prices = await fetchPriceHistory(id);
+      const labels = prices.map(p => new Date(p[0]).toLocaleDateString());
+      const dataPoints = prices.map(p => p[1]);
+
+      if(chart) {
+        chart.destroy();
+      }
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: name,
+            data: dataPoints,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, 0.2)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { 
+              ticks: { maxRotation: 45, minRotation: 45 }
+            },
+            y: { beginAtZero: false }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+    }
+
+    // Initial load
+    fetchTopCryptos();
+  </script>
+</body>
+</html>
